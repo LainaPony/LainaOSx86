@@ -54,7 +54,6 @@ long_mode_entry:
 	movq $0x9000, %rsp
 	call kmain 
 
-#this next part should never run but if it does then someone fucked up and its probobly not me
 
 halt_loop:
 	hlt
