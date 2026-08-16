@@ -1,0 +1,264 @@
+     1                                  BITS 16
+     2                                  ORG 0x7C00
+     3                                  
+     4                                  start:
+     5 00000000 FA                          cli
+     6 00000001 31C0                        xor ax, ax
+     7 00000003 8ED8                        mov ds, ax
+     8 00000005 8EC0                        mov es, ax
+     9 00000007 8ED0                        mov ss, ax
+    10 00000009 BC007C                      mov sp, 0x7C00
+    11 0000000C FB                          sti
+    12                                  
+    13 0000000D B400                        mov ah, 0x00
+    14 0000000F B003                        mov al, 0x03
+    15 00000011 CD10                        int 0x10
+    16                                  
+    17 00000013 BE[7601]                    mov si, banner
+    18 00000016 E88B00                      call print_string
+    19                                  
+    20                                  main_loop:
+    21 00000019 BE[8301]                    mov si, prompt
+    22 0000001C E88500                      call print_string
+    23 0000001F BF[B301]                    mov di, input_buf
+    24 00000022 E89F00                      call read_line
+    25 00000025 BE[B301]                    mov si, input_buf
+    26 00000028 AC                          lodsb
+    27 00000029 3C44                        cmp al, 'D'
+    28 0000002B 7426                        je cmd_dump
+    29 0000002D 3C4D                        cmp al, 'M'
+    30 0000002F 744D                        je cmd_modify
+    31 00000031 3C48                        cmp al, 'H'
+    32 00000033 7406                        je cmd_help
+    33 00000035 3C52                        cmp al, 'R'
+    34 00000037 740A                        je cmd_reboot
+    35 00000039 EBDE                        jmp main_loop
+    36                                  
+    37                                  cmd_help:
+    38 0000003B BE[8601]                    mov si, help_text
+    39 0000003E E86300                      call print_string
+    40 00000041 EBD6                        jmp main_loop
+    41                                  
+    42                                  cmd_reboot:
+    43 00000043 B84000                      mov ax, 0x40
+    44 00000046 8ED8                        mov ds, ax
+    45 00000048 C70672003412                mov word [0x0072], 0x1234
+    46 0000004E EA0000FFFF                  jmp 0xFFFF:0x0000
+    47                                  
+    48                                  cmd_dump:
+    49 00000053 BE[B301]                    mov si, input_buf
+    50 00000056 46                          inc si
+    51 00000057 E8E600                      call parse_seg_off
+    52 0000005A 8ED8                        mov ds, ax
+    53 0000005C BE[A201]                    mov si, dump_header
+    54 0000005F E84200                      call print_string
+    55 00000062 B91000                      mov cx, 16
+    56                                  dump_loop:
+    57 00000065 8A07                        mov al, [bx]
+    58 00000067 E8E500                      call print_hex2
+    59 0000006A B020                        mov al, ' '
+    60 0000006C E84400                      call print_char
+    61 0000006F 43                          inc bx
+    62 00000070 E2F3                        loop dump_loop
+    63 00000072 B00D                        mov al, 0x0D
+    64 00000074 E83C00                      call print_char
+    65 00000077 B00A                        mov al, 0x0A
+    66 00000079 E83700                      call print_char
+    67                                      mov ds, 0
+    67          ******************       error: invalid combination of opcode and operands
+    68 0000007C EB9B                        jmp main_loop
+    69                                  
+    70                                  cmd_modify:
+    71 0000007E BE[B301]                    mov si, input_buf
+    72 00000081 46                          inc si
+    73 00000082 E8BB00                      call parse_seg_off
+    74 00000085 8ED8                        mov ds, ax
+    75 00000087 BE[A901]                    mov si, modify_msg
+    76 0000008A E81700                      call print_string
+    77 0000008D BF[D301]                    mov di, input_buf2
+    78 00000090 E83100                      call read_line
+    79 00000093 BE[D301]                    mov si, input_buf2
+    80 00000096 E87500                      call parse_hex2
+    81 00000099 8807                        mov [bx], al
+    82 0000009B BE[AE01]                    mov si, ok_msg
+    83 0000009E E80300                      call print_string
+    84                                      mov ds, 0
+    84          ******************       error: invalid combination of opcode and operands
+    85 000000A1 E975FF                      jmp main_loop
+    86                                  
+    87                                  print_string:
+    88 000000A4 50                          push ax
+    89 000000A5 56                          push si
+    90                                  .ps_loop:
+    91 000000A6 AC                          lodsb
+    92 000000A7 84C0                        test al, al
+    93 000000A9 7405                        jz .ps_done
+    94 000000AB E80500                      call print_char
+    95 000000AE EBF6                        jmp .ps_loop
+    96                                  .ps_done:
+    97 000000B0 5E                          pop si
+    98 000000B1 58                          pop ax
+    99 000000B2 C3                          ret
+   100                                  
+   101                                  print_char:
+   102 000000B3 50                          push ax
+   103 000000B4 53                          push bx
+   104 000000B5 51                          push cx
+   105 000000B6 52                          push dx
+   106 000000B7 B40E                        mov ah, 0x0E
+   107 000000B9 B700                        mov bh, 0x00
+   108 000000BB B307                        mov bl, 0x07
+   109 000000BD CD10                        int 0x10
+   110 000000BF 5A                          pop dx
+   111 000000C0 59                          pop cx
+   112 000000C1 5B                          pop bx
+   113 000000C2 58                          pop ax
+   114 000000C3 C3                          ret
+   115                                  
+   116                                  read_line:
+   117 000000C4 50                          push ax
+   118 000000C5 57                          push di
+   119                                  .rl_loop:
+   120 000000C6 B400                        mov ah, 0x00
+   121 000000C8 CD16                        int 0x16
+   122 000000CA 3C0D                        cmp al, 0x0D
+   123 000000CC 7406                        je .rl_done
+   124 000000CE E8E2FF                      call print_char
+   125 000000D1 AA                          stosb
+   126 000000D2 EBF2                        jmp .rl_loop
+   127                                  .rl_done:
+   128 000000D4 B000                        mov al, 0
+   129 000000D6 AA                          stosb
+   130 000000D7 B00D                        mov al, 0x0D
+   131 000000D9 E8D7FF                      call print_char
+   132 000000DC B00A                        mov al, 0x0A
+   133 000000DE E8D2FF                      call print_char
+   134 000000E1 5F                          pop di
+   135 000000E2 58                          pop ax
+   136 000000E3 C3                          ret
+   137                                  
+   138                                  parse_hex_digit:
+   139 000000E4 3C30                        cmp al, '0'
+   140 000000E6 7214                        jb .err
+   141 000000E8 3C39                        cmp al, '9'
+   142 000000EA 7612                        jbe .num
+   143 000000EC 3C41                        cmp al, 'A'
+   144 000000EE 720C                        jb .err
+   145 000000F0 3C46                        cmp al, 'F'
+   146 000000F2 760E                        jbe .upper
+   147 000000F4 3C61                        cmp al, 'a'
+   148 000000F6 7204                        jb .err
+   149 000000F8 3C66                        cmp al, 'f'
+   150 000000FA 760C                        jbe .lower
+   151                                  .err:
+   152 000000FC F9                          stc
+   153 000000FD C3                          ret
+   154                                  .num:
+   155 000000FE 2C30                        sub al, '0'
+   156 00000100 F8                          clc
+   157 00000101 C3                          ret
+   158                                  .upper:
+   159 00000102 2C41                        sub al, 'A'
+   160 00000104 040A                        add al, 10
+   161 00000106 F8                          clc
+   162 00000107 C3                          ret
+   163                                  .lower:
+   164 00000108 2C61                        sub al, 'a'
+   165 0000010A 040A                        add al, 10
+   166 0000010C F8                          clc
+   167 0000010D C3                          ret
+   168                                  
+   169                                  parse_hex2:
+   170 0000010E 53                          push bx
+   171 0000010F AC                          lodsb
+   172 00000110 E8D1FF                      call parse_hex_digit
+   173 00000113 720F                        jc .ph2_err
+   174 00000115 88C3                        mov bl, al
+   175 00000117 AC                          lodsb
+   176 00000118 E8C9FF                      call parse_hex_digit
+   177 0000011B 7207                        jc .ph2_err
+   178 0000011D C0E304                      shl bl, 4
+   179 00000120 08D8                        or al, bl
+   180 00000122 EB02                        jmp .ph2_done
+   181                                  .ph2_err:
+   182 00000124 30C0                        xor al, al
+   183                                  .ph2_done:
+   184 00000126 5B                          pop bx
+   185 00000127 C3                          ret
+   186                                  
+   187                                  parse_hex4:
+   188 00000128 31D2                        xor dx, dx
+   189 0000012A B90400                      mov cx, 4
+   190                                  .ph4_loop:
+   191 0000012D AC                          lodsb
+   192 0000012E E8B3FF                      call parse_hex_digit
+   193 00000131 720A                        jc .ph4_err
+   194 00000133 C1E204                      shl dx, 4
+   195 00000136 00C2                        add dl, al
+   196 00000138 E2F3                        loop .ph4_loop
+   197 0000013A 89D0                        mov ax, dx
+   198 0000013C C3                          ret
+   199                                  .ph4_err:
+   200 0000013D 31C0                        xor ax, ax
+   201 0000013F C3                          ret
+   202                                  
+   203                                  parse_seg_off:
+   204 00000140 E8E5FF                      call parse_hex4
+   205 00000143 89C2                        mov dx, ax
+   206 00000145 AC                          lodsb
+   207 00000146 AC                          lodsb
+   208 00000147 E8DEFF                      call parse_hex4
+   209 0000014A 89C3                        mov bx, ax
+   210 0000014C 89D0                        mov ax, dx
+   211 0000014E C3                          ret
+   212                                  
+   213                                  print_hex2:
+   214 0000014F 50                          push ax
+   215 00000150 53                          push bx
+   216 00000151 88C3                        mov bl, al
+   217 00000153 C0EB04                      shr bl, 4
+   218 00000156 E80B00                      call print_hex_nibble
+   219 00000159 88C3                        mov bl, al
+   220 0000015B 80E30F                      and bl, 0x0F
+   221 0000015E E80300                      call print_hex_nibble
+   222 00000161 5B                          pop bx
+   223 00000162 58                          pop ax
+   224 00000163 C3                          ret
+   225                                  
+   226                                  print_hex_nibble:
+   227 00000164 50                          push ax
+   228 00000165 88D8                        mov al, bl
+   229 00000167 3C09                        cmp al, 9
+   230 00000169 7604                        jbe .digit
+   231 0000016B 0437                        add al, 'A' - 10
+   232 0000016D EB02                        jmp .out
+   233                                  .digit:
+   234 0000016F 0430                        add al, '0'
+   235                                  .out:
+   236 00000171 E83FFF                      call print_char
+   237 00000174 58                          pop ax
+   238 00000175 C3                          ret
+   239                                  
+   240                                  banner:
+   241 00000176 0D0A                        db 0x0D,0x0A
+   242 00000178 4C61696E614D6F6E0D-         db "LainaMon",0x0D,0x0A,0
+   242 00000181 0A00               
+   243                                  prompt:
+   244 00000183 3E2000                      db "> ",0
+   245                                  help_text:
+   246 00000186 44737373733A6F6F6F-         db "Dssss:oooo Mssss:oooo H R",0x0D,0x0A,0
+   246 0000018F 6F204D737373733A6F-
+   246 00000198 6F6F6F204820520D0A-
+   246 000001A1 00                 
+   247                                  dump_header:
+   248 000001A2 44756D700D0A00              db "Dump",0x0D,0x0A,0
+   249                                  modify_msg:
+   250 000001A9 4E65773A00                  db "New:",0
+   251                                  ok_msg:
+   252 000001AE 4F4B0D0A00                  db "OK",0x0D,0x0A,0
+   253                                  
+   254 000001B3 00<rep 20h>             input_buf:   times 32 db 0
+   255 000001D3 00<rep 4h>              input_buf2:  times 4  db 0
+   256                                  
+   257 000001D7 00<rep 27h>             times 510-($-$$) db 0
+   258 000001FE 55AA                    dw 0xAA55
